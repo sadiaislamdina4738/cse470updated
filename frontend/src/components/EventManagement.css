@@ -1,0 +1,169 @@
+.event-management {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 24px;
+}
+
+.management-header {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e1e5e9;
+}
+
+.management-header h3 {
+    margin: 0 0 8px 0;
+    color: #2c3e50;
+    font-size: 1.5rem;
+}
+
+.management-header p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.pending-requests-section,
+.attendees-section,
+.waitlist-section {
+    margin-bottom: 24px;
+}
+
+.pending-requests-section h4,
+.attendees-section h4,
+.waitlist-section h4 {
+    margin: 0 0 16px 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.requests-list,
+.attendees-list,
+.waitlist-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.request-item,
+.attendee-item,
+.waitlist-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.request-info,
+.attendee-info,
+.waitlist-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.request-user,
+.attendee-user,
+.waitlist-user {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.request-status,
+.attendee-status,
+.waitlist-status {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.request-actions,
+.attendee-actions,
+.waitlist-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    border-radius: 6px;
+}
+
+.event-settings {
+    padding-top: 16px;
+    border-top: 1px solid #e1e5e9;
+}
+
+.no-pending-requests {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    color: #6c757d;
+    margin-bottom: 20px;
+}
+
+.no-pending-requests p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.event-settings h4 {
+    margin: 0 0 16px 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.setting-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.setting-item label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: #2c3e50;
+    cursor: pointer;
+}
+
+.setting-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.setting-item small {
+    color: #6c757d;
+    font-size: 0.8rem;
+    margin-left: 24px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .event-management {
+        padding: 16px;
+    }
+
+    .request-item,
+    .attendee-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .request-actions,
+    .attendee-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
