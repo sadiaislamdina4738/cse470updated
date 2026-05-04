@@ -24,11 +24,16 @@ const register = async (req, res) => {
       return ErrorService.conflict(res, 'User with this email or username already exists');
     }
 
+    const initialAdminEmail = (process.env.INITIAL_ADMIN_EMAIL || '').toLowerCase().trim();
+    const role =
+      initialAdminEmail && email.toLowerCase().trim() === initialAdminEmail ? 'admin' : 'user';
+
     // Create new user
     const user = new User({
       email,
       username,
-      password
+      password,
+      role
     });
 
     await user.save();
@@ -47,7 +52,9 @@ const register = async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive
       }
     });
 
@@ -80,6 +87,10 @@ const login = async (req, res) => {
       return ErrorService.unauthorized(res, 'Invalid credentials');
     }
 
+    if (user.isActive === false) {
+      return ErrorService.unauthorized(res, 'Account has been deactivated');
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id },
@@ -94,7 +105,9 @@ const login = async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive
       }
     });
 

@@ -4,8 +4,8 @@ const { getChatMessages, sendMessage } = require('../controllers/chatController'
 const auth = require('../middleware/auth');
 const router = express.Router();
 
-// GET /api/events/chat - Get chat messages for an event
-router.get('/', [
+// GET /api/events/chat - Get chat messages for an event (members only)
+router.get('/', auth, [
   query('eventId').isMongoId().withMessage('Valid event ID is required')
 ], getChatMessages);
 

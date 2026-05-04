@@ -49,30 +49,37 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Features Section — cards link to Events; tabs on Event Detail expose chat / QR / feedback */}
       <section className="features">
         <h2 className="section-title">Why Choose EventEase?</h2>
+        <p className="features-hint">
+          Tap a card to open Discover Events. For chat, QR share, or feedback, pick an event and use its tabs.
+        </p>
         <div className="features-grid">
-          <div className="feature-card">
+          <Link to="/events" className="feature-card feature-card-link">
             <div className="feature-icon">🎯</div>
             <h3>Easy Discovery</h3>
             <p>Find events that match your interests and location with our smart filtering system.</p>
-          </div>
-          <div className="feature-card">
+            <span className="feature-cta">Browse events →</span>
+          </Link>
+          <Link to="/events" className="feature-card feature-card-link">
             <div className="feature-icon">💬</div>
             <h3>Real-time Chat</h3>
             <p>Connect with other attendees before and during events with our integrated chat feature.</p>
-          </div>
-          <div className="feature-card">
+            <span className="feature-cta">Open an event → Chat tab</span>
+          </Link>
+          <Link to="/events" className="feature-card feature-card-link">
             <div className="feature-icon">📱</div>
             <h3>QR Code Sharing</h3>
             <p>Share events easily with friends using QR codes and social media integration.</p>
-          </div>
-          <div className="feature-card">
+            <span className="feature-cta">Open an event → Share tab</span>
+          </Link>
+          <Link to="/events" className="feature-card feature-card-link">
             <div className="feature-icon">⭐</div>
             <h3>Feedback System</h3>
             <p>Rate and review events to help others discover the best local experiences.</p>
-          </div>
+            <span className="feature-cta">Open an event → Feedback tab</span>
+          </Link>
         </div>
       </section>
 

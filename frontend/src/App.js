@@ -5,6 +5,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import { EventProvider } from './contexts/EventContext';
 import { SocketProvider } from './contexts/SocketContext';
 import PrivateRoute from './components/PrivateRoute';
+import AdminRoute from './components/AdminRoute';
+import AdminDashboard from './pages/AdminDashboard';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -29,6 +31,14 @@ function App() {
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/events" element={<EventList />} />
+                  <Route
+                    path="/events/:id/edit"
+                    element={
+                      <PrivateRoute>
+                        <CreateEvent />
+                      </PrivateRoute>
+                    }
+                  />
                   <Route path="/events/:id" element={<EventDetail />} />
                   <Route
                     path="/create-event"
@@ -44,6 +54,14 @@ function App() {
                       <PrivateRoute>
                         <Profile />
                       </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin"
+                    element={
+                      <AdminRoute>
+                        <AdminDashboard />
+                      </AdminRoute>
                     }
                   />
                   <Route path="*" element={<Navigate to="/" replace />} />

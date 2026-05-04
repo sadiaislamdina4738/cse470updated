@@ -89,6 +89,16 @@ export const AuthProvider = ({ children }) => {
     toast.success('Logged out successfully');
   };
 
+  const refreshUser = useCallback(async () => {
+    if (!localStorage.getItem('token')) return;
+    try {
+      const response = await api.get('/auth/me');
+      setUser(response.data.user);
+    } catch (error) {
+      console.error('Error refreshing user:', error);
+    }
+  }, []);
+
   const value = {
     user,
     token,
@@ -96,6 +106,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    refreshUser,
     isAuthenticated: !!token || !!user
   };
 

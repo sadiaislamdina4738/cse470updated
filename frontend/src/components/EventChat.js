@@ -25,9 +25,15 @@ const EventChat = ({ eventId }) => {
     try {
       setLoading(true);
       const response = await api.get(`/events/chat?eventId=${eventId}`);
-      setMessages(response.data.messages);
+      setMessages(response.data.messages || []);
+      setError('');
     } catch (error) {
-      setError('Failed to load chat messages');
+      const msg =
+        error.response?.data?.message ||
+        (error.response?.status === 403
+          ? 'You can only view chat after you join this event (RSVP / approval / waitlist).'
+          : 'Failed to load chat messages');
+      setError(msg);
       console.error('Error fetching messages:', error);
     } finally {
       setLoading(false);
@@ -44,16 +50,16 @@ const EventChat = ({ eventId }) => {
       if (socketSendMessage) {
         try {
           const result = await socketSendMessage(eventId, newMessage.trim());
-          if (result.success) {
-            // Add message to local state immediately for optimistic UI
-            const tempMessage = {
-              _id: Date.now().toString(),
-              eventId,
-              message: newMessage.trim(),
-              userId: { _id: user?.id, username: user?.username || 'You' },
-              createdAt: new Date()
-            };
-            setMessages(prev => [...prev, tempMessage]);
+          if (result?.success) {
+            // Server ack includes saved message; room also emits `new-message`.
+            // Append once by real _id only (do not add a temp optimistic row).
+            const saved = result.data;
+            if (saved && saved._id) {
+              setMessages((prev) => {
+                if (prev.some((m) => String(m._id) === String(saved._id))) return prev;
+                return [...prev, saved];
+              });
+            }
             setNewMessage('');
             scrollToBottom();
             return;
@@ -82,18 +88,13 @@ const EventChat = ({ eventId }) => {
   // Handle incoming real-time messages
   useEffect(() => {
     const handleNewMessage = (message) => {
-      // Only add message if it's for this event and not already in the list
-      if (message.eventId === eventId) {
-        setMessages(prev => {
-          // Check if message already exists to avoid duplicates
-          const exists = prev.some(m => m._id === message._id);
-          if (!exists) {
-            return [...prev, message];
-          }
-          return prev;
-        });
-        scrollToBottom();
-      }
+      if (String(message.eventId) !== String(eventId)) return;
+      setMessages((prev) => {
+        const exists = prev.some((m) => String(m._id) === String(message._id));
+        if (exists) return prev;
+        return [...prev, message];
+      });
+      scrollToBottom();
     };
 
     onNewMessage(eventId, handleNewMessage);
@@ -147,7 +148,7 @@ const EventChat = ({ eventId }) => {
           messages.map((message) => (
             <div
               key={message._id}
-              className={`message ${message.userId._id === user?.id ? 'own-message' : ''}`}
+              className={`message ${String(message.userId?._id || message.userId) === String(user?._id || user?.id) ? 'own-message' : ''}`}
             >
               <div className="message-header">
                 <span className="message-author">{message.userId.username}</span>

@@ -118,11 +118,18 @@ const getEventFeedback = async (req, res) => {
     const totalRating = feedback.reduce((sum, item) => sum + item.rating, 0);
     const averageRating = feedback.length > 0 ? totalRating / feedback.length : 0;
 
+    const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    feedback.forEach((item) => {
+      const r = Math.min(5, Math.max(1, Math.round(item.rating)));
+      ratingDistribution[r] += 1;
+    });
+
     res.json({
       status: 'success',
       feedback,
       averageRating: Math.round(averageRating * 10) / 10,
-      totalFeedback: feedback.length
+      totalFeedback: feedback.length,
+      ratingDistribution
     });
 
   } catch (error) {

@@ -31,6 +31,15 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Event'
   }],
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -61,6 +70,8 @@ userSchema.methods.toProfileJSON = function () {
     id: this._id,
     username: this.username,
     email: this.email,
+    role: this.role,
+    isActive: this.isActive,
     eventsCreated: this.eventsCreated,
     eventsJoined: this.eventsJoined,
     createdAt: this.createdAt

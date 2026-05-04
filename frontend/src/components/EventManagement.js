@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useEvents } from '../contexts/EventContext';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import './EventManagement.css';
 
 const EventManagement = ({ event, onEventUpdate }) => {
     const { user } = useAuth();
+    const { updateEvent } = useEvents();
     const [loading, setLoading] = useState(false);
+    const [settingsLoading, setSettingsLoading] = useState(false);
 
     // Check if current user is the event creator (supports both populated object and raw ID)
     const currentUserId = user?._id || user?.id;
@@ -139,13 +142,25 @@ const EventManagement = ({ event, onEventUpdate }) => {
                     <label>
                         <input
                             type="checkbox"
-                            checked={event.requiresApproval}
-                            disabled
-                            readOnly
+                            checked={!!event.requiresApproval}
+                            disabled={settingsLoading}
+                            onChange={async (e) => {
+                                setSettingsLoading(true);
+                                try {
+                                    const result = await updateEvent(event._id, {
+                                        requiresApproval: e.target.checked
+                                    });
+                                    if (result.success && onEventUpdate) {
+                                        onEventUpdate(result.event);
+                                    }
+                                } finally {
+                                    setSettingsLoading(false);
+                                }
+                            }}
                         />
                         Require approval for join requests
                     </label>
-                    <small>This setting is currently enabled for all events</small>
+                    <small>When off, users join immediately until the event is full.</small>
                 </div>
             </div>
         </div>

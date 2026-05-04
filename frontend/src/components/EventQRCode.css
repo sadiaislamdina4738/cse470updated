@@ -219,3 +219,9 @@
     width: 100%;
   }
 }
+
+.qr-loading {
+  text-align: center;
+  color: #64748b;
+  font-size: 0.95rem;
+}

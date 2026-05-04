@@ -24,6 +24,13 @@ const auth = async (req, res, next) => {
       });
     }
 
+    if (user.isActive === false) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Account has been deactivated.'
+      });
+    }
+
     req.user = user;
     next();
   } catch (error) {

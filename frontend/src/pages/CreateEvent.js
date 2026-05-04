@@ -1,20 +1,57 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
+import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useEvents } from '../contexts/EventContext';
 import './CreateEvent.css';
 
 const CreateEvent = () => {
+  const { id: editEventId } = useParams();
+  const isEdit = Boolean(editEventId);
   const [isLoading, setIsLoading] = useState(false);
-  const { createEvent } = useEvents();
+  const [loadError, setLoadError] = useState(null);
+  const { createEvent, updateEvent, fetchEventById } = useEvents();
   const navigate = useNavigate();
 
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors }
-  } = useForm();
+  } = useForm({
+    defaultValues: {
+      requiresApproval: true
+    }
+  });
+
+  useEffect(() => {
+    if (!editEventId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const ev = await fetchEventById(editEventId);
+        if (cancelled || !ev) return;
+        const d = new Date(ev.schedule);
+        reset({
+          title: ev.title || '',
+          description: ev.description || '',
+          category: ev.category || '',
+          location: ev.location || '',
+          latitude: ev.coordinates?.lat ?? '',
+          longitude: ev.coordinates?.lng ?? '',
+          schedule: format(d, 'yyyy-MM-dd'),
+          time: format(d, 'HH:mm'),
+          maxAttendees: ev.maxAttendees ?? '',
+          banner: ev.banner || '',
+          requiresApproval: !!ev.requiresApproval
+        });
+      } catch (e) {
+        if (!cancelled) setLoadError('Failed to load event');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [editEventId, fetchEventById, reset]);
 
   const categories = [
     'Technology', 'Business', 'Education', 'Entertainment', 'Sports', 'Health', 'Other'
@@ -37,7 +74,8 @@ const CreateEvent = () => {
       const eventData = {
         ...data,
         schedule: scheduleDate.toISOString(),
-        maxAttendees: data.maxAttendees ? parseInt(data.maxAttendees) : undefined
+        maxAttendees: data.maxAttendees ? parseInt(data.maxAttendees, 10) : undefined,
+        requiresApproval: Boolean(data.requiresApproval)
       };
 
       // Only add coordinates if both latitude and longitude are provided
@@ -50,8 +88,12 @@ const CreateEvent = () => {
 
       // Remove the time field as it's not needed by the backend
       delete eventData.time;
+      delete eventData.latitude;
+      delete eventData.longitude;
 
-      const result = await createEvent(eventData);
+      const result = isEdit
+        ? await updateEvent(editEventId, eventData)
+        : await createEvent(eventData);
       if (result.success) {
         navigate(`/events/${result.event._id}`);
       }
@@ -62,11 +104,22 @@ const CreateEvent = () => {
     }
   };
 
+  if (isEdit && loadError) {
+    return (
+      <div className="create-event-page">
+        <div className="page-header">
+          <h1>Edit Event</h1>
+          <p>{loadError}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="create-event-page">
       <div className="page-header">
-        <h1>Create New Event</h1>
-        <p>Share your event with the community</p>
+        <h1>{isEdit ? 'Edit Event' : 'Create New Event'}</h1>
+        <p>{isEdit ? 'Update your event details' : 'Share your event with the community'}</p>
       </div>
 
       <div className="create-event-container">
@@ -268,6 +321,19 @@ const CreateEvent = () => {
           </div>
 
           <div className="form-section">
+            <h3>RSVP settings</h3>
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input type="checkbox" {...register('requiresApproval')} />
+                Require organizer approval for join requests
+              </label>
+              <small className="form-help">
+                If unchecked, users can join immediately until the event is full.
+              </small>
+            </div>
+          </div>
+
+          <div className="form-section">
             <h3>Event Banner (Optional)</h3>
 
             <div className="form-group">
@@ -299,7 +365,7 @@ const CreateEvent = () => {
               className="btn btn-primary btn-large"
               disabled={isLoading}
             >
-              {isLoading ? 'Creating Event...' : 'Create Event'}
+              {isLoading ? (isEdit ? 'Saving...' : 'Creating Event...') : (isEdit ? 'Save Changes' : 'Create Event')}
             </button>
           </div>
         </form>

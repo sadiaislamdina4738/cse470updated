@@ -4,11 +4,10 @@ import { useEvents } from '../contexts/EventContext';
 import { useAuth } from '../contexts/AuthContext';
 import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth } from 'date-fns';
 import EventMap from '../components/EventMap';
-import CalendarIntegration from '../components/CalendarIntegration';
 import './EventList.css';
 
 const EventList = () => {
-  const { events, loading, filters, updateFilters } = useEvents();
+  const { events, loading, filters, updateFilters, rsvpToEvent } = useEvents();
   const { isAuthenticated, user } = useAuth();
   const [localFilters, setLocalFilters] = useState(filters);
   const [viewMode, setViewMode] = useState('list'); // 'list', 'map', 'calendar'
@@ -25,9 +24,24 @@ const EventList = () => {
   };
 
   const resetFilters = () => {
-    const resetFilters = { category: '', location: '', limit: 20 };
-    setLocalFilters(resetFilters);
-    updateFilters(resetFilters);
+    const reset = {
+      category: '',
+      location: '',
+      q: '',
+      from: '',
+      to: '',
+      sort: 'schedule_asc',
+      limit: 20
+    };
+    setLocalFilters(reset);
+    updateFilters(reset);
+  };
+
+  const currentUserId = user?._id || user?.id;
+  const uid = currentUserId ? String(currentUserId) : '';
+
+  const handleListRsvp = async (eventId) => {
+    await rsvpToEvent(eventId);
   };
 
   const categories = [
@@ -108,6 +122,54 @@ const EventList = () => {
               value={localFilters.location}
               onChange={(e) => handleFilterChange('location', e.target.value)}
             />
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="q" className="filter-label">Search</label>
+            <input
+              type="text"
+              id="q"
+              className="form-input"
+              placeholder="Title, description, or location"
+              value={localFilters.q || ''}
+              onChange={(e) => handleFilterChange('q', e.target.value)}
+            />
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="from" className="filter-label">From date</label>
+            <input
+              type="date"
+              id="from"
+              className="form-input"
+              value={localFilters.from || ''}
+              onChange={(e) => handleFilterChange('from', e.target.value)}
+            />
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="to" className="filter-label">To date</label>
+            <input
+              type="date"
+              id="to"
+              className="form-input"
+              value={localFilters.to || ''}
+              onChange={(e) => handleFilterChange('to', e.target.value)}
+            />
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="sort" className="filter-label">Sort</label>
+            <select
+              id="sort"
+              className="form-select"
+              value={localFilters.sort || 'schedule_asc'}
+              onChange={(e) => handleFilterChange('sort', e.target.value)}
+            >
+              <option value="schedule_asc">Date (soonest first)</option>
+              <option value="schedule_desc">Date (latest first)</option>
+              <option value="created_desc">Newest listings</option>
+            </select>
           </div>
 
           <div className="filter-group">
@@ -294,48 +356,32 @@ const EventList = () => {
                         </Link>
                         {isAuthenticated && (
                           <button
-                            className={`btn ${event.attendees.some(a => {
-                              const attendeeId = a._id || a;
-                              const userId = user?.id;
-                              return attendeeId === userId;
-                            })
+                            type="button"
+                            className={`btn ${event.attendees?.some((a) => String(a?._id || a) === uid)
                               ? 'btn-success'
-                              : event.pendingRequests?.some(a => {
-                                const requestId = a._id || a;
-                                return requestId === user?.id;
-                              })
+                              : event.pendingRequests?.some((a) => String(a?._id || a) === uid)
                                 ? 'btn-warning'
-                                : event.waitlist?.some(a => {
-                                  const waitlistId = a._id || a;
-                                  return waitlistId === user?.id;
-                                })
+                                : event.waitlist?.some((a) => String(a?._id || a) === uid)
                                   ? 'btn-info'
                                   : 'btn-secondary'}`}
-                            disabled={event.attendees.some(a => {
-                              const attendeeId = a._id || a;
-                              return attendeeId === user?.id;
-                            }) || event.pendingRequests?.some(a => {
-                              const requestId = a._id || a;
-                              return requestId === user?.id;
-                            }) || event.waitlist?.some(a => {
-                              const waitlistId = a._id || a;
-                              return waitlistId === user?.id;
-                            })}
+                            disabled={
+                              event.attendees?.some((a) => String(a?._id || a) === uid) ||
+                              event.pendingRequests?.some((a) => String(a?._id || a) === uid) ||
+                              event.waitlist?.some((a) => String(a?._id || a) === uid)
+                            }
+                            onClick={() => {
+                              const joined =
+                                event.attendees?.some((a) => String(a?._id || a) === uid) ||
+                                event.pendingRequests?.some((a) => String(a?._id || a) === uid) ||
+                                event.waitlist?.some((a) => String(a?._id || a) === uid);
+                              if (!joined) handleListRsvp(event._id);
+                            }}
                           >
-                            {event.attendees.some(a => {
-                              const attendeeId = a._id || a;
-                              return attendeeId === user?.id;
-                            })
+                            {event.attendees?.some((a) => String(a?._id || a) === uid)
                               ? 'Already RSVPed'
-                              : event.pendingRequests?.some(a => {
-                                const requestId = a._id || a;
-                                return requestId === user?.id;
-                              })
+                              : event.pendingRequests?.some((a) => String(a?._id || a) === uid)
                                 ? 'Request Pending'
-                                : event.waitlist?.some(a => {
-                                  const waitlistId = a._id || a;
-                                  return waitlistId === user?.id;
-                                })
+                                : event.waitlist?.some((a) => String(a?._id || a) === uid)
                                   ? 'On Waitlist'
                                   : 'RSVP'}
                           </button>

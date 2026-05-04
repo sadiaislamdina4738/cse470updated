@@ -1,11 +1,13 @@
-const { validationResult, query } = require('express-validator');
+const { validationResult } = require('express-validator');
 const ChatMessage = require('../models/ChatMessage');
 const Event = require('../models/Event');
+const { userCanAccessEventChat } = require('../utils/eventChatAccess');
 
 // Get chat messages for an event
 const getChatMessages = async (req, res) => {
   try {
     const { eventId } = req.query;
+    const userId = req.user._id;
 
     // Check if event exists
     const event = await Event.findById(eventId);
@@ -13,6 +15,13 @@ const getChatMessages = async (req, res) => {
       return res.status(404).json({
         status: 'error',
         message: 'Event not found'
+      });
+    }
+
+    if (!userCanAccessEventChat(event, userId)) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'You do not have access to this event chat'
       });
     }
 
@@ -63,16 +72,10 @@ const sendMessage = async (req, res) => {
     }
 
 
-    // Check if user is attending, has pending request, or is on waitlist
-    const isAttending = event.attendees.includes(userId);
-    const hasPendingRequest = event.pendingRequests.includes(userId);
-    const isOnWaitlist = event.waitlist.includes(userId);
-    const isCreator = event.creator.toString() === userId.toString();
-
-    if (!isAttending && !hasPendingRequest && !isOnWaitlist && !isCreator) {
+    if (!userCanAccessEventChat(event, userId)) {
       return res.status(403).json({
         status: 'error',
-        message: 'You must be attending, have a pending request, or be the event creator to send messages'
+        message: 'You do not have access to send messages in this event chat'
       });
     }
 
@@ -92,7 +95,7 @@ const sendMessage = async (req, res) => {
     // Emit message to all users in the event chat via Socket.io
     const io = req.app.get('io');
     if (io) {
-      io.to(`event-${eventId}`).emit('new-message', populatedMessage);
+      io.to(`event-chat-${eventId}`).emit('new-message', populatedMessage);
     }
 
     res.status(201).json({

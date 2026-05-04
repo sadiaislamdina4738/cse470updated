@@ -23,8 +23,14 @@ router.get('/me', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
       .select('-password')
-      .populate('eventsCreated', 'title category location schedule createdAt')
-      .populate('eventsJoined', 'title category location schedule createdAt');
+      .populate(
+        'eventsCreated',
+        'title description category location schedule createdAt isActive'
+      )
+      .populate(
+        'eventsJoined',
+        'title description category location schedule createdAt isActive'
+      );
 
     if (!user) {
       return res.status(404).json({

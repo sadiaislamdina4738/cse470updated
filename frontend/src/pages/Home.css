@@ -106,7 +106,16 @@
   font-size: 2.5rem;
   font-weight: 700;
   color: #2c3e50;
-  margin-bottom: 3rem;
+  margin-bottom: 1rem;
+}
+
+.features-hint {
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto 2rem;
+  color: #5e6b83;
+  line-height: 1.55;
+  font-size: 1rem;
 }
 
 .features-grid {
@@ -128,6 +137,25 @@
 .feature-card:hover {
   transform: translateY(-8px);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+}
+
+a.feature-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+a.feature-card-link:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 4px;
+}
+
+.feature-cta {
+  display: inline-block;
+  margin-top: 1rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #667eea;
 }
 
 .feature-icon {

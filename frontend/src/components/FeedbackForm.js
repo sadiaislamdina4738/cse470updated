@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import './FeedbackForm.css';
 
-const FeedbackForm = ({ eventId, onSubmitSuccess }) => {
+const FeedbackForm = ({ event, eventId, onSubmitSuccess }) => {
+  const { isAuthenticated, user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
@@ -16,12 +18,24 @@ const FeedbackForm = ({ eventId, onSubmitSuccess }) => {
     reset
   } = useForm();
 
+  const uid = user?._id || user?.id;
+  const uidStr = uid != null ? String(uid) : '';
+
+  const isPast = event?.schedule && new Date(event.schedule) < new Date();
+  const isAttendee =
+    event?.attendees?.some((a) => {
+      const id = a?._id || a?.id || a;
+      return String(id) === uidStr;
+    }) ?? false;
+
+  const canSubmitFeedback = isAuthenticated && isPast && isAttendee;
+
   const handleRatingChange = (newRating) => {
     setRating(newRating);
   };
 
-  const handleRatingHover = (hoveredRating) => {
-    setHoveredRating(hoveredRating);
+  const handleRatingHover = (hr) => {
+    setHoveredRating(hr);
   };
 
   const handleRatingLeave = () => {
@@ -56,7 +70,7 @@ const FeedbackForm = ({ eventId, onSubmitSuccess }) => {
       const message = error.response?.data?.message || 'Failed to submit feedback';
       if (error.response?.data?.errors) {
         console.error('Validation errors:', error.response.data.errors);
-        const validationErrors = error.response.data.errors.map(err => err.msg).join(', ');
+        const validationErrors = error.response.data.errors.map((err) => err.msg).join(', ');
         toast.error(`Validation errors: ${validationErrors}`);
       } else {
         toast.error(message);
@@ -70,7 +84,7 @@ const FeedbackForm = ({ eventId, onSubmitSuccess }) => {
     const stars = [];
     const displayRating = hoveredRating || rating;
 
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 5; i += 1) {
       stars.push(
         <button
           key={i}
@@ -88,6 +102,24 @@ const FeedbackForm = ({ eventId, onSubmitSuccess }) => {
 
     return stars;
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="feedback-form-container feedback-gate">
+        <p>Log in to leave feedback after you attend an event.</p>
+      </div>
+    );
+  }
+
+  if (!canSubmitFeedback) {
+    return (
+      <div className="feedback-form-container feedback-gate">
+        <h4>Feedback</h4>
+        {!isPast && <p>Feedback opens after the event date has passed.</p>}
+        {isPast && !isAttendee && <p>Only attendees who joined the event can submit feedback.</p>}
+      </div>
+    );
+  }
 
   return (
     <div className="feedback-form-container">

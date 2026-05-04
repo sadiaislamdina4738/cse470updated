@@ -1,37 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode.react';
+import api from '../utils/api';
+import toast from 'react-hot-toast';
 import './EventQRCode.css';
 
 const EventQRCode = ({ event }) => {
   const [showQR, setShowQR] = useState(false);
   const [downloadFormat, setDownloadFormat] = useState('png');
+  const [shareUrl, setShareUrl] = useState('');
+  const [linkLoading, setLinkLoading] = useState(true);
+
+  useEffect(() => {
+    if (!event?._id) return undefined;
+    let cancelled = false;
+    (async () => {
+      setLinkLoading(true);
+      try {
+        const res = await api.get(`/events/${event._id}/share-link`);
+        const url = res.data?.shareUrl;
+        if (!cancelled && url) setShareUrl(url);
+      } catch {
+        if (!cancelled) {
+          const fallback = `${window.location.origin}/events/${event._id}`;
+          setShareUrl(fallback);
+          toast.error('Could not load canonical link; using current origin.');
+        }
+      } finally {
+        if (!cancelled) setLinkLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [event?._id]);
 
   if (!event) return null;
 
-  // Generate event URL for QR code
-  const eventUrl = `${window.location.origin}/events/${event._id}`;
-  
-  // Generate event data for sharing
-  const eventData = {
-    title: event.title,
-    description: event.description,
-    location: event.location,
-    schedule: event.schedule,
-    url: eventUrl
-  };
+  const displayUrl = shareUrl || `${window.location.origin}/events/${event._id}`;
 
   const handleDownload = () => {
     const canvas = document.querySelector('#event-qr-canvas');
     if (!canvas) return;
 
     if (downloadFormat === 'png') {
-      // Download as PNG
       const link = document.createElement('a');
       link.download = `event-${event.title.replace(/\s+/g, '-')}-qr.png`;
       link.href = canvas.toDataURL();
       link.click();
     } else if (downloadFormat === 'svg') {
-      // Download as SVG
       const svg = document.querySelector('#event-qr-svg');
       if (svg) {
         const svgData = new XMLSerializer().serializeToString(svg);
@@ -52,16 +68,15 @@ const EventQRCode = ({ event }) => {
         await navigator.share({
           title: event.title,
           text: `Check out this event: ${event.title} at ${event.location}`,
-          url: eventUrl
+          url: displayUrl
         });
       } catch (error) {
         console.log('Error sharing:', error);
       }
     } else {
-      // Fallback: copy to clipboard
       try {
-        await navigator.clipboard.writeText(eventUrl);
-        alert('Event URL copied to clipboard!');
+        await navigator.clipboard.writeText(displayUrl);
+        toast.success('Event URL copied to clipboard');
       } catch (error) {
         console.log('Error copying to clipboard:', error);
       }
@@ -78,6 +93,7 @@ const EventQRCode = ({ event }) => {
       <div className="qr-content">
         <div className="qr-toggle">
           <button
+            type="button"
             onClick={() => setShowQR(!showQR)}
             className="btn btn-primary"
           >
@@ -85,27 +101,27 @@ const EventQRCode = ({ event }) => {
           </button>
         </div>
 
-        {showQR && (
+        {linkLoading && <p className="qr-loading">Resolving share link…</p>}
+
+        {showQR && !linkLoading && (
           <div className="qr-display">
             <div className="qr-code-wrapper">
-              {/* PNG version for download */}
               <div style={{ display: 'none' }}>
                 <QRCode
                   id="event-qr-canvas"
-                  value={JSON.stringify(eventData)}
+                  value={displayUrl}
                   size={200}
                   level="M"
-                  includeMargin={true}
+                  includeMargin
                 />
               </div>
-              
-              {/* SVG version for display and download */}
+
               <QRCode
                 id="event-qr-svg"
-                value={JSON.stringify(eventData)}
+                value={displayUrl}
                 size={200}
                 level="M"
-                includeMargin={true}
+                includeMargin
                 renderAs="svg"
               />
             </div>
@@ -126,18 +142,12 @@ const EventQRCode = ({ event }) => {
                   <option value="png">PNG</option>
                   <option value="svg">SVG</option>
                 </select>
-                <button
-                  onClick={handleDownload}
-                  className="btn btn-secondary"
-                >
+                <button type="button" onClick={handleDownload} className="btn btn-secondary">
                   Download QR
                 </button>
               </div>
-              
-              <button
-                onClick={handleShare}
-                className="btn btn-primary"
-              >
+
+              <button type="button" onClick={handleShare} className="btn btn-primary">
                 Share Event
               </button>
             </div>
@@ -150,12 +160,15 @@ const EventQRCode = ({ event }) => {
             <input
               id="event-url"
               type="text"
-              value={eventUrl}
+              value={displayUrl}
               readOnly
               className="url-input"
             />
             <button
-              onClick={() => navigator.clipboard.writeText(eventUrl)}
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(displayUrl).then(() => toast.success('Copied')).catch(() => {});
+              }}
               className="copy-btn"
               title="Copy URL"
             >

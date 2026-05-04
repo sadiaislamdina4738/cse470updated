@@ -7,6 +7,7 @@ const FeedbackDisplay = ({ eventId }) => {
   const [feedback, setFeedback] = useState([]);
   const [averageRating, setAverageRating] = useState(0);
   const [totalFeedback, setTotalFeedback] = useState(0);
+  const [ratingDistribution, setRatingDistribution] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -17,6 +18,7 @@ const FeedbackDisplay = ({ eventId }) => {
       setFeedback(response.data.feedback);
       setAverageRating(response.data.averageRating);
       setTotalFeedback(response.data.totalFeedback);
+      setRatingDistribution(response.data.ratingDistribution || null);
     } catch (error) {
       setError('Failed to load feedback');
       console.error('Error fetching feedback:', error);
@@ -105,6 +107,25 @@ const FeedbackDisplay = ({ eventId }) => {
             <p>Based on {totalFeedback} review{totalFeedback !== 1 ? 's' : ''}</p>
           </div>
         </div>
+
+        {ratingDistribution && (
+          <div className="rating-distribution">
+            <h4>Rating breakdown</h4>
+            {[5, 4, 3, 2, 1].map((star) => {
+              const count = ratingDistribution[star] || 0;
+              const pct = totalFeedback ? Math.round((count / totalFeedback) * 100) : 0;
+              return (
+                <div key={star} className="dist-row">
+                  <span className="dist-label">{star}★</span>
+                  <div className="dist-bar-wrap">
+                    <div className="dist-bar" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="dist-count">{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="feedback-list">

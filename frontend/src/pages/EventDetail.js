@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useEvents } from '../contexts/EventContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../contexts/SocketContext';
 import { format } from 'date-fns';
 import EventChat from '../components/EventChat';
 import FeedbackForm from '../components/FeedbackForm';
@@ -14,19 +15,113 @@ import './EventDetail.css';
 
 const EventDetail = () => {
   const { id } = useParams();
-  const { getEventById, rsvpToEvent } = useEvents();
+  const navigate = useNavigate();
+  const { fetchEventById, patchEventInList, rsvpToEvent, cancelRsvp, deleteEvent } = useEvents();
   const { isAuthenticated, user } = useAuth();
+  const { joinEventLive, leaveEventLive, subscribeEventUpdated } = useSocket();
   const [activeTab, setActiveTab] = useState('details');
   const [rsvpLoading, setRsvpLoading] = useState(false);
+  const [event, setEvent] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(true);
+  const [feedbackRefreshKey, setFeedbackRefreshKey] = useState(0);
 
-  const event = getEventById(id);
+  const loadEvent = useCallback(async () => {
+    setDetailLoading(true);
+    try {
+      const ev = await fetchEventById(id);
+      setEvent(ev || null);
+    } catch {
+      setEvent(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [id, fetchEventById]);
+
+  useEffect(() => {
+    loadEvent();
+  }, [loadEvent]);
+
+  useEffect(() => {
+    if (!id || !isAuthenticated) return undefined;
+    joinEventLive(id);
+    const unsub = subscribeEventUpdated((doc) => {
+      const docId = doc?._id != null ? String(doc._id) : '';
+      if (docId !== String(id)) return;
+      patchEventInList(doc);
+      if (doc.isActive === false) {
+        toast.error('This event is no longer available');
+        navigate('/events');
+        return;
+      }
+      setEvent(doc);
+    });
+    return () => {
+      unsub();
+      leaveEventLive(id);
+    };
+  }, [
+    id,
+    isAuthenticated,
+    joinEventLive,
+    leaveEventLive,
+    subscribeEventUpdated,
+    patchEventInList,
+    navigate
+  ]);
+
+  const handleRSVP = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please log in to RSVP to this event');
+      return;
+    }
+    setRsvpLoading(true);
+    try {
+      const result = await rsvpToEvent(event._id);
+      if (result.success && result.event) {
+        setEvent(result.event);
+      }
+    } finally {
+      setRsvpLoading(false);
+    }
+  };
+
+  const handleCancelRsvp = async () => {
+    setRsvpLoading(true);
+    try {
+      const result = await cancelRsvp(event._id);
+      if (result.success && result.event) {
+        setEvent(result.event);
+      }
+    } finally {
+      setRsvpLoading(false);
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!window.confirm('Delete this event? It will be hidden from the public list.')) return;
+    const result = await deleteEvent(event._id);
+    if (result.success) {
+      navigate('/events');
+    }
+  };
+
+  if (detailLoading) {
+    return (
+      <div className="event-detail-page">
+        <div className="loading-container">
+          <div className="loading-spinner" />
+          <p>Loading event...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!event) {
     return (
       <div className="event-detail-page">
         <div className="loading-container">
           <h2>Event not found</h2>
-          <p>The event you're looking for doesn't exist or has been removed.</p>
+          <p>The event you&apos;re looking for doesn&apos;t exist or has been removed.</p>
           <Link to="/events" className="btn btn-primary">
             Back to Events
           </Link>
@@ -35,41 +130,25 @@ const EventDetail = () => {
     );
   }
 
-  const handleRSVP = async () => {
-    if (!isAuthenticated) {
-      toast.error('Please log in to RSVP to this event');
-      return;
-    }
-
-    setRsvpLoading(true);
-    try {
-      const result = await rsvpToEvent(event._id);
-      if (result.success) {
-        toast.success('Successfully RSVP\'d to event!');
-        // Refresh the page to update the event data
-        window.location.reload();
-      }
-    } catch (error) {
-      toast.error('Failed to RSVP to event');
-    } finally {
-      setRsvpLoading(false);
-    }
-  };
-
   const currentUserId = user?._id || user?.id;
+  const uid = currentUserId ? String(currentUserId) : '';
+
   const isAttending = event.attendees?.some((attendee) => {
     const attendeeId = attendee?._id || attendee?.id || attendee;
-    return String(attendeeId) === String(currentUserId);
+    return String(attendeeId) === uid;
   });
 
-  // Check if current user is the event creator (supports both populated object and raw ID)
+  const isPending = event.pendingRequests?.some((p) => String(p?._id || p) === uid);
+  const isWaitlisted = event.waitlist?.some((w) => String(w?._id || w) === uid);
+
   const creatorId = typeof event.creator === 'object' ? (event.creator?._id || event.creator?.id) : event.creator;
-  const isCreator = creatorId && currentUserId && String(creatorId) === String(currentUserId);
+  const isCreator = creatorId && uid && String(creatorId) === uid;
   const hasPendingRequests = event.pendingRequests && event.pendingRequests.length > 0;
+
+  const canUseChat = isAuthenticated && (isAttending || isPending || isWaitlisted || isCreator);
 
   return (
     <div className="event-detail-page">
-      {/* Notification banner for pending requests */}
       {isCreator && hasPendingRequests && (
         <div className="pending-requests-banner">
           <div className="banner-content">
@@ -78,8 +157,9 @@ const EventDetail = () => {
               You have {event.pendingRequests.length} pending join request(s) that need your approval
             </span>
             <button
+              type="button"
               className="btn btn-primary btn-sm"
-              onClick={() => setActiveTab('details')}
+              onClick={() => setActiveTab('manage')}
             >
               Review Requests
             </button>
@@ -119,7 +199,7 @@ const EventDetail = () => {
             </div>
             <div className="meta-item">
               <span className="meta-icon">👥</span>
-              <span>{event.attendees.length} attending</span>
+              <span>{event.attendees?.length || 0} attending</span>
             </div>
           </div>
         </div>
@@ -142,7 +222,10 @@ const EventDetail = () => {
               <strong>Date & Time:</strong> {format(new Date(event.schedule), 'EEEE, MMMM dd, yyyy at h:mm a')}
             </div>
             <div className="detail-item">
-              <strong>Attendees:</strong> {event.attendees.length} / {event.maxAttendees || 'Unlimited'}
+              <strong>Attendees:</strong> {event.attendees?.length || 0} / {event.maxAttendees || '—'}
+            </div>
+            <div className="detail-item">
+              <strong>Approval required:</strong> {event.requiresApproval ? 'Yes' : 'No'}
             </div>
           </div>
 
@@ -150,12 +233,47 @@ const EventDetail = () => {
             <h3>Actions</h3>
             {isAuthenticated ? (
               <div className="action-buttons">
+                {isCreator && (
+                  <>
+                    <Link to={`/events/${event._id}/edit`} className="btn btn-secondary btn-large">
+                      Edit Event
+                    </Link>
+                    <button type="button" className="btn btn-danger btn-large" onClick={handleDeleteEvent}>
+                      Delete Event
+                    </button>
+                  </>
+                )}
                 {isAttending ? (
-                  <button className="btn btn-success btn-large" disabled>
-                    ✓ Already Attending
-                  </button>
+                  <>
+                    <button type="button" className="btn btn-success btn-large" disabled>
+                      ✓ Already Attending
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-large"
+                      onClick={handleCancelRsvp}
+                      disabled={rsvpLoading}
+                    >
+                      {rsvpLoading ? 'Updating...' : 'Cancel RSVP'}
+                    </button>
+                  </>
+                ) : isPending || isWaitlisted ? (
+                  <>
+                    <button type="button" className="btn btn-warning btn-large" disabled>
+                      {isPending ? 'Request Pending' : 'On Waitlist'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-large"
+                      onClick={handleCancelRsvp}
+                      disabled={rsvpLoading}
+                    >
+                      {rsvpLoading ? 'Updating...' : 'Withdraw'}
+                    </button>
+                  </>
                 ) : (
                   <button
+                    type="button"
                     className="btn btn-primary btn-large"
                     onClick={handleRSVP}
                     disabled={rsvpLoading}
@@ -163,10 +281,10 @@ const EventDetail = () => {
                     {rsvpLoading ? 'RSVPing...' : 'RSVP to Event'}
                   </button>
                 )}
-                <button className="btn btn-secondary">
+                <button type="button" className="btn btn-secondary" onClick={() => setActiveTab('share')}>
                   Share Event
                 </button>
-                <button className="btn btn-secondary">
+                <button type="button" className="btn btn-secondary" onClick={() => setActiveTab('details')}>
                   Add to Calendar
                 </button>
               </div>
@@ -187,10 +305,10 @@ const EventDetail = () => {
         </div>
       </div>
 
-      {/* Event Tabs */}
       <div className="event-tabs-container">
         <div className="event-tabs">
           <button
+            type="button"
             className={`tab-button ${activeTab === 'details' ? 'active' : ''}`}
             onClick={() => setActiveTab('details')}
           >
@@ -198,6 +316,7 @@ const EventDetail = () => {
           </button>
           {isCreator && (
             <button
+              type="button"
               className={`tab-button ${activeTab === 'manage' ? 'active' : ''}`}
               onClick={() => setActiveTab('manage')}
             >
@@ -205,18 +324,21 @@ const EventDetail = () => {
             </button>
           )}
           <button
+            type="button"
             className={`tab-button ${activeTab === 'chat' ? 'active' : ''}`}
             onClick={() => setActiveTab('chat')}
           >
             Chat
           </button>
           <button
+            type="button"
             className={`tab-button ${activeTab === 'feedback' ? 'active' : ''}`}
             onClick={() => setActiveTab('feedback')}
           >
             Feedback
           </button>
           <button
+            type="button"
             className={`tab-button ${activeTab === 'share' ? 'active' : ''}`}
             onClick={() => setActiveTab('share')}
           >
@@ -246,7 +368,7 @@ const EventDetail = () => {
                     </div>
                     <div className="info-item">
                       <span className="info-label">Max Attendees:</span>
-                      <span className="info-value">{event.maxAttendees || 'Unlimited'}</span>
+                      <span className="info-value">{event.maxAttendees || '—'}</span>
                     </div>
                     <div className="info-item">
                       <span className="info-label">Current Attendees:</span>
@@ -269,8 +391,8 @@ const EventDetail = () => {
                 <EventManagement
                   event={event}
                   onEventUpdate={(updatedEvent) => {
-                    // Refresh the page to update event data
-                    window.location.reload();
+                    setEvent(updatedEvent);
+                    patchEventInList(updatedEvent);
                   }}
                 />
               ) : (
@@ -283,8 +405,12 @@ const EventDetail = () => {
 
           {activeTab === 'chat' && (
             <div className="tab-panel">
-              {isAuthenticated ? (
+              {canUseChat ? (
                 <EventChat eventId={event._id} />
+              ) : isAuthenticated ? (
+                <div className="access-denied">
+                  <p>Join this event (RSVP) to access chat.</p>
+                </div>
               ) : (
                 <div className="login-prompt">
                   <p>Please log in to join the event chat</p>
@@ -298,16 +424,15 @@ const EventDetail = () => {
 
           {activeTab === 'feedback' && (
             <div className="tab-panel">
-              <FeedbackDisplay eventId={event._id} />
-              {isAuthenticated && (
-                <FeedbackForm
-                  eventId={event._id}
-                  onSubmitSuccess={() => {
-                    // Refresh feedback display
-                    setActiveTab('feedback');
-                  }}
-                />
-              )}
+              <FeedbackDisplay key={feedbackRefreshKey} eventId={event._id} />
+              <FeedbackForm
+                event={event}
+                eventId={event._id}
+                onSubmitSuccess={() => {
+                  setFeedbackRefreshKey((k) => k + 1);
+                  setActiveTab('feedback');
+                }}
+              />
             </div>
           )}
 

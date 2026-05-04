@@ -18,8 +18,25 @@ export const EventProvider = ({ children }) => {
   const [filters, setFilters] = useState({
     category: '',
     location: '',
+    q: '',
+    from: '',
+    to: '',
+    sort: 'schedule_asc',
     limit: 20
   });
+
+  const patchEventInList = useCallback((updatedEvent) => {
+    if (!updatedEvent?._id) return;
+    setEvents((prev) => {
+      const idx = prev.findIndex((e) => e._id === updatedEvent._id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = updatedEvent;
+        return next;
+      }
+      return [...prev, updatedEvent];
+    });
+  }, []);
 
   const fetchEvents = useCallback(async (customFilters = filters) => {
     setLoading(true);
@@ -27,6 +44,10 @@ export const EventProvider = ({ children }) => {
       const params = new URLSearchParams();
       if (customFilters.category) params.append('category', customFilters.category);
       if (customFilters.location) params.append('location', customFilters.location);
+      if (customFilters.q) params.append('q', customFilters.q);
+      if (customFilters.from) params.append('from', new Date(customFilters.from).toISOString());
+      if (customFilters.to) params.append('to', new Date(customFilters.to).toISOString());
+      if (customFilters.sort) params.append('sort', customFilters.sort);
       if (customFilters.limit) params.append('limit', customFilters.limit);
 
       const response = await api.get(`/events?${params}`);
@@ -39,12 +60,19 @@ export const EventProvider = ({ children }) => {
     }
   }, [filters]);
 
+  const fetchEventById = useCallback(async (eventId) => {
+    const response = await api.get(`/events/${eventId}`);
+    const ev = response.data.event;
+    patchEventInList(ev);
+    return ev;
+  }, [patchEventInList]);
+
   const createEvent = async (eventData) => {
     try {
       const response = await api.post('/events/create', eventData);
       const newEvent = response.data.event;
 
-      setEvents(prev => [newEvent, ...prev]);
+      setEvents((prev) => [newEvent, ...prev]);
       toast.success('Event created successfully!');
       return { success: true, event: newEvent };
     } catch (error) {
@@ -52,7 +80,7 @@ export const EventProvider = ({ children }) => {
       const message = error.response?.data?.message || 'Failed to create event';
       if (error.response?.data?.errors) {
         console.error('Validation errors:', error.response.data.errors);
-        const validationErrors = error.response.data.errors.map(err => err.msg).join(', ');
+        const validationErrors = error.response.data.errors.map((err) => err.msg).join(', ');
         toast.error(`Validation errors: ${validationErrors}`);
       } else {
         toast.error(message);
@@ -61,23 +89,58 @@ export const EventProvider = ({ children }) => {
     }
   };
 
+  const updateEvent = async (eventId, payload) => {
+    try {
+      const response = await api.put(`/events/${eventId}`, payload);
+      const updated = response.data.event;
+      patchEventInList(updated);
+      toast.success('Event updated successfully!');
+      return { success: true, event: updated };
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to update event';
+      toast.error(message);
+      return { success: false, message };
+    }
+  };
+
+  const deleteEvent = async (eventId) => {
+    try {
+      await api.delete(`/events/${eventId}`);
+      setEvents((prev) => prev.filter((e) => e._id !== eventId));
+      toast.success('Event deleted');
+      return { success: true };
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to delete event';
+      toast.error(message);
+      return { success: false, message };
+    }
+  };
+
   const rsvpToEvent = async (eventId) => {
     try {
       const response = await api.post('/events/rsvp', { eventId });
 
-      // Update the event in the local state with the response from backend
       const updatedEvent = response.data.event;
-      setEvents(prev => prev.map(event => {
-        if (event._id === eventId) {
-          return updatedEvent;
-        }
-        return event;
-      }));
+      patchEventInList(updatedEvent);
 
-      toast.success('Successfully RSVPed to event!');
-      return { success: true, event: updatedEvent };
+      toast.success(response.data.message || 'RSVP updated');
+      return { success: true, event: updatedEvent, waitlisted: response.data.waitlisted };
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to RSVP to event';
+      toast.error(message);
+      return { success: false, message };
+    }
+  };
+
+  const cancelRsvp = async (eventId) => {
+    try {
+      const response = await api.post('/events/cancel-rsvp', { eventId });
+      const updatedEvent = response.data.event;
+      patchEventInList(updatedEvent);
+      toast.success(response.data.message || 'RSVP cancelled');
+      return { success: true, event: updatedEvent };
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to cancel RSVP';
       toast.error(message);
       return { success: false, message };
     }
@@ -90,7 +153,7 @@ export const EventProvider = ({ children }) => {
   };
 
   const getEventById = (eventId) => {
-    return events.find(event => event._id === eventId);
+    return events.find((event) => event._id === eventId);
   };
 
   const refreshEvents = () => {
@@ -106,8 +169,13 @@ export const EventProvider = ({ children }) => {
     loading,
     filters,
     fetchEvents,
+    fetchEventById,
     createEvent,
+    updateEvent,
+    deleteEvent,
     rsvpToEvent,
+    cancelRsvp,
+    patchEventInList,
     updateFilters,
     getEventById,
     refreshEvents
