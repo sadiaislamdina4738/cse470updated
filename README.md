@@ -60,41 +60,4 @@ There is **no separate admin login page**. You use the normal **Register** or **
 
 ### Option A — first-time admin (recommended for a new database)
 
-1. In `backend/.env`, set `INITIAL_ADMIN_EMAIL` to the **exact** email you will register (case-insensitive).
-2. Start the backend, then **Register** with that email and a password.
-3. That account gets `role: admin` on creation.
-4. Log in → the navbar shows **Admin** → open [http://localhost:3000/admin](http://localhost:3000/admin).
-
-If you already registered that email **before** setting `INITIAL_ADMIN_EMAIL`, that user stays `user`. Either register a different admin email, or update the user in MongoDB (`role: 'admin'`) and log in again.
-
-### Option B — promote an existing user in MongoDB
-
-In Atlas (or mongosh), update the user document:
-
-```js
-db.users.updateOne(
-  { email: "you@example.com" },
-  { $set: { role: "admin" } }
-)
-```
-
-Then log out and log in again so the UI picks up `role`.
-
-### Deactivated users
-
-Users with `isActive: false` cannot authenticate (login and API token checks fail). Admins can reactivate users from the admin dashboard.
-
-## API highlights
-
-- `GET /api/events` — filters: `category`, `location`, `q`, `from`, `to`, `sort`, `limit`
-- `GET /api/events/:id/share-link` — canonical event URL for QR
-- `POST /api/events/cancel-rsvp` — leave RSVP / pending / waitlist
-- Admin: `GET /api/admin/users`, `PATCH /api/admin/users/:id`, `GET /api/admin/events`, `DELETE /api/admin/events/:id`, `GET /api/admin/analytics`
-
-## Security notes
-
-- Never commit real `.env` files or database passwords.
-- CORS is restricted to `FRONTEND_URL`.
-- Login and register routes are rate-limited.
-
-# cse470updated
+1
