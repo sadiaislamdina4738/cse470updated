@@ -145,7 +145,7 @@ const EventDetail = () => {
   const isCreator = creatorId && uid && String(creatorId) === uid;
   const hasPendingRequests = event.pendingRequests && event.pendingRequests.length > 0;
 
-  const canUseChat = isAuthenticated && (isAttending || isPending || isWaitlisted || isCreator);
+  const canUseChat = isAuthenticated && (isAttending || isCreator);
 
   return (
     <div className="event-detail-page">
@@ -278,7 +278,7 @@ const EventDetail = () => {
                     onClick={handleRSVP}
                     disabled={rsvpLoading}
                   >
-                    {rsvpLoading ? 'RSVPing...' : 'RSVP to Event'}
+                    {rsvpLoading ? 'Submitting...' : (event.requiresApproval ? 'Request to Join' : 'RSVP to Event')}
                   </button>
                 )}
                 <button type="button" className="btn btn-secondary" onClick={() => setActiveTab('share')}>
@@ -409,7 +409,13 @@ const EventDetail = () => {
                 <EventChat eventId={event._id} />
               ) : isAuthenticated ? (
                 <div className="access-denied">
-                  <p>Join this event (RSVP) to access chat.</p>
+                  <p>
+                    {isPending
+                      ? 'Your join request is pending organizer approval. Chat unlocks after approval.'
+                      : isWaitlisted
+                        ? 'You are on the waitlist. Chat unlocks after you are promoted to attendee.'
+                        : 'RSVP and get approved to access chat.'}
+                  </p>
                 </div>
               ) : (
                 <div className="login-prompt">

@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator');
 const Event = require('../models/Event');
 const User = require('../models/User');
 const { emitEventUpdated: broadcastEventUpdated } = require('../utils/emitEventUpdated');
+const { createNotification } = require('../services/notificationService');
 
 function attendeeCount(event) {
   return Array.isArray(event.attendees) ? event.attendees.length : 0;
@@ -13,6 +14,14 @@ function eventHasCapacity(event) {
 
 async function emitEventUpdated(req, eventId) {
   await broadcastEventUpdated(req.app, eventId);
+}
+
+async function getPopulatedEventById(eventId) {
+  return Event.findById(eventId)
+    .populate('creator', 'username')
+    .populate('attendees', 'username')
+    .populate('pendingRequests', 'username')
+    .populate('waitlist', 'username');
 }
 
 // Get all events with optional filtering
@@ -179,11 +188,19 @@ const rsvpToEvent = async (req, res) => {
     if (event.isFull) {
       // Add to waitlist instead
       if (!event.waitlist.some((id) => id.toString() === userId.toString())) {
-        const updatedEvent = await Event.findByIdAndUpdate(
+        await Event.findByIdAndUpdate(
           eventId,
           { $push: { waitlist: userId } },
           { new: true, runValidators: false }
-        ).populate('creator', 'username');
+        );
+        const updatedEvent = await getPopulatedEventById(eventId);
+        await createNotification({
+          userId,
+          eventId,
+          type: 'waitlist_added',
+          title: 'Added to waitlist',
+          message: `You were added to the waitlist for "${event.title}".`
+        });
 
         return res.json({
           status: 'success',
@@ -236,26 +253,35 @@ const rsvpToEvent = async (req, res) => {
 
     if (event.requiresApproval) {
       // Add user to pending requests
-      updatedEvent = await Event.findByIdAndUpdate(
+      await Event.findByIdAndUpdate(
         eventId,
         { $push: { pendingRequests: userId } },
         { new: true, runValidators: false }
-      ).populate('creator', 'username');
+      );
+      updatedEvent = await getPopulatedEventById(eventId);
 
+      await createNotification({
+        userId: event.creator,
+        eventId,
+        type: 'join_request_received',
+        title: 'New join request',
+        message: `${req.user.username} requested to join "${event.title}".`
+      });
       message = 'Join request sent! Waiting for organizer approval.';
     } else {
       // Add user directly to attendees
-      updatedEvent = await Event.findByIdAndUpdate(
+      await Event.findByIdAndUpdate(
         eventId,
         { $push: { attendees: userId } },
         { new: true, runValidators: false }
-      ).populate('creator', 'username');
+      );
 
       // Update user's eventsJoined array
       await User.findByIdAndUpdate(
         userId,
         { $push: { eventsJoined: eventId } }
       );
+      updatedEvent = await getPopulatedEventById(eventId);
 
       message = 'Successfully RSVP\'d to event';
     }
@@ -548,6 +574,13 @@ const manageAttendees = async (req, res) => {
             { $push: { eventsJoined: eventId } }
           );
         }
+        await createNotification({
+          userId,
+          eventId,
+          type: 'join_request_approved',
+          title: 'Join request approved',
+          message: `Your request to join "${event.title}" was approved.`
+        });
         message = 'Request approved successfully';
       } else {
         return res.status(400).json({
@@ -559,6 +592,13 @@ const manageAttendees = async (req, res) => {
       // Reject a pending request
       if (event.pendingRequests.some((id) => id.toString() === userId.toString())) {
         event.pendingRequests = event.pendingRequests.filter(id => id.toString() !== userId.toString());
+        await createNotification({
+          userId,
+          eventId,
+          type: 'join_request_rejected',
+          title: 'Join request rejected',
+          message: `Your request to join "${event.title}" was rejected by the organizer.`
+        });
         message = 'Request rejected successfully';
       } else {
         return res.status(400).json({
@@ -573,6 +613,13 @@ const manageAttendees = async (req, res) => {
         userId,
         { $pull: { eventsJoined: eventId } }
       );
+      await createNotification({
+        userId,
+        eventId,
+        type: 'removed_from_event',
+        title: 'Removed from event',
+        message: `You were removed from "${event.title}" by the organizer.`
+      });
 
       // Promote someone from waitlist if available and capacity allows
       if (event.waitlist.length > 0 && eventHasCapacity(event)) {
@@ -582,6 +629,13 @@ const manageAttendees = async (req, res) => {
           promotedUser,
           { $push: { eventsJoined: eventId } }
         );
+        await createNotification({
+          userId: promotedUser,
+          eventId,
+          type: 'waitlist_promoted',
+          title: 'Promoted from waitlist',
+          message: `You are now an attendee of "${event.title}".`
+        });
         message = 'Attendee removed and waitlist user promoted';
       } else {
         message = 'Attendee removed successfully';
@@ -603,6 +657,13 @@ const manageAttendees = async (req, res) => {
             { $push: { eventsJoined: eventId } }
           );
         }
+        await createNotification({
+          userId,
+          eventId,
+          type: 'waitlist_promoted',
+          title: 'Promoted from waitlist',
+          message: `You are now an attendee of "${event.title}".`
+        });
         message = 'User promoted from waitlist successfully';
       } else {
         return res.status(400).json({

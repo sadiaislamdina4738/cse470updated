@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import './Navbar.css';
 
 const Navbar = () => {
   const { isAuthenticated, logout, user } = useAuth();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -26,6 +28,10 @@ const Navbar = () => {
           {isAuthenticated ? (
             <>
               <Link to="/create-event" className="nav-link">Create Event</Link>
+              <Link to="/notifications" className="nav-link nav-notification-link">
+                Notifications
+                {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
+              </Link>
               {user?.role === 'admin' && (
                 <Link to="/admin" className="nav-link">Admin</Link>
               )}

@@ -51,6 +51,24 @@
   transform: translateY(-1px);
 }
 
+.nav-notification-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.notification-badge {
+  min-width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.75rem;
+  line-height: 1.2rem;
+  text-align: center;
+  padding: 0 0.25rem;
+}
+
 .nav-button {
   background: none;
   border: none;

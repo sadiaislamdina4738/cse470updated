@@ -18,10 +18,11 @@ const io = configureSocket(server);
 const socketService = new SocketService(io);
 
 // Middleware
-const corsOrigin = process.env.FRONTEND_URL || 'http://localhost:3000';
+const corsOriginEnv = process.env.FRONTEND_URL || 'http://localhost:3000';
+const allowedOrigins = corsOriginEnv.split(',').map((o) => o.trim()).filter(Boolean);
 app.use(
   cors({
-    origin: corsOrigin,
+    origin: allowedOrigins,
     credentials: true
   })
 );
@@ -46,6 +47,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/events/chat', require('./routes/chat'));
 app.use('/api/events/feedback', require('./routes/feedback'));
 app.use('/api/events', require('./routes/events'));
+app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/admin', require('./routes/admin'));
 
 // Make io available to routes

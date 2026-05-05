@@ -1,17 +1,17 @@
 /**
- * Per SRS: chat access for creator, attendees, pending join requests, and waitlist.
+ * Chat access for creator and approved attendees.
  */
 function userCanAccessEventChat(event, userId) {
   if (!event || !userId) return false;
   const uid = userId.toString();
-  if (event.creator && event.creator.toString() === uid) return true;
+  const creatorId = typeof event.creator === 'object' ? (event.creator?._id || event.creator?.id) : event.creator;
+  if (creatorId && creatorId.toString() === uid) return true;
 
-  const lists = [event.attendees, event.pendingRequests, event.waitlist];
-  for (const list of lists) {
-    if (!Array.isArray(list)) continue;
-    if (list.some((id) => id.toString() === uid)) return true;
-  }
-  return false;
+  if (!Array.isArray(event.attendees)) return false;
+  return event.attendees.some((attendee) => {
+    const attendeeId = attendee?._id || attendee?.id || attendee;
+    return attendeeId && attendeeId.toString() === uid;
+  });
 }
 
 module.exports = { userCanAccessEventChat };
